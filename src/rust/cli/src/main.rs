@@ -1,4 +1,5 @@
 use anyhow::Result;
+use cjseq::CityJSON;
 use clap::{Parser, Subcommand};
 use fcb_core::{
     attribute::{AttributeSchema, AttributeSchemaMethods},
@@ -11,7 +12,6 @@ use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     path::PathBuf,
 };
-
 #[derive(Parser)]
 #[command(author, version, about = "CLI tool for CityJSON <-> FCB conversion")]
 struct Cli {
@@ -42,6 +42,26 @@ enum Commands {
         #[arg(short, long)]
         input: String,
 
+        /// Output file (use '-' for stdout)
+        #[arg(short, long)]
+        output: String,
+    },
+
+    /// Convert CityJSON to CBOR
+    Cbor {
+        /// Input file (use '-' for stdin)
+        #[arg(short, long)]
+        input: String,
+        /// Output file (use '-' for stdout)
+        #[arg(short, long)]
+        output: String,
+    },
+
+    /// Convert CityJSON to BSON
+    Bson {
+        /// Input file (use '-' for stdin)
+        #[arg(short, long)]
+        input: String,
         /// Output file (use '-' for stdout)
         #[arg(short, long)]
         output: String,
@@ -152,6 +172,40 @@ fn deserialize(input: &str, output: &str) -> Result<()> {
     Ok(())
 }
 
+fn encode_cbor(input: &str, output: &str) -> Result<()> {
+    let reader = BufReader::new(get_reader(input)?);
+    let writer = BufWriter::new(get_writer(output)?);
+
+    let value: serde_json::Value = serde_json::from_reader(reader)?;
+    serde_cbor::to_writer(writer, &value)?;
+
+    if output != "-" {
+        eprintln!("successfully encoded to cbor");
+    }
+    Ok(())
+}
+
+fn encode_bson(input: &str, output: &str) -> Result<()> {
+    let mut reader = BufReader::new(get_reader(input)?);
+    let json_str = {
+        let mut s = String::new();
+        reader.read_to_string(&mut s)?;
+        s
+    };
+
+    let cityjson: CityJSON = serde_json::from_str(&json_str)?;
+    let bson = bson::to_bson(&cityjson)?;
+    let doc = bson.as_document().unwrap();
+
+    let mut writer = get_writer(output)?;
+    doc.to_writer(&mut writer)?;
+
+    if output != "-" {
+        eprintln!("successfully encoded to bson");
+    }
+    Ok(())
+}
+
 fn show_info(input: PathBuf) -> Result<()> {
     let reader = BufReader::new(File::open(input)?);
     let metadata = reader.get_ref().metadata()?.len() / 1024 / 1024; // show in megabytes
@@ -196,6 +250,8 @@ fn main() -> Result<()> {
             attr_index,
         } => serialize(&input, &output, attr_index),
         Commands::Deser { input, output } => deserialize(&input, &output),
+        Commands::Cbor { input, output } => encode_cbor(&input, &output),
+        Commands::Bson { input, output } => encode_bson(&input, &output),
         Commands::Info { input } => show_info(input),
     }
 }
