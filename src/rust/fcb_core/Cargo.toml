@@ -75,6 +75,14 @@ path = "benches/read_profile.rs"
 name = "read_cj"
 path = "src/bin/read_cj.rs"
 
+[[bin]]
+name = "read_attr_stream"
+path = "src/bin/read_attr_stream.rs"
+
+[[bin]]
+name = "read_attr"
+path = "src/bin/read_attr.rs"
+
 [[bench]]
 name = "read"
 harness = false
@@ -89,5 +97,12 @@ memory-stats = { workspace = true }
 pretty_assertions = { workspace = true }
 criterion = { workspace = true, features = ["async_tokio", "html_reports"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+# --performance comparison
 bson = { workspace = true }
 serde_cbor = { workspace = true }
+
+
+[profile.release]
+debug = 1
+strip = "debuginfo"
